@@ -1,0 +1,28 @@
+﻿@{
+    ViewData["Title"] = "Threefold — Tic Tac Toe";
+}
+
+<main class="game-shell">
+    <header class="masthead"><a class="wordmark" href="/">threefold<span>✳</span></a><span class="edition">A little game of X and O</span></header>
+    <section class="intro"><p class="eyebrow">A familiar nine</p><h1>Make your<br /><em>next move.</em></h1><p class="lede">Three in a row. A moment to think.<br />Choose how you want to play.</p></section>
+    <section class="play-area" aria-label="Tic Tac Toe game">
+        <div class="mode-picker" role="group" aria-label="Game mode">
+            <button class="mode-button active" data-mode="Local" aria-pressed="true">Two players</button>
+            <button class="mode-button" data-mode="VsAi" aria-pressed="false">Play the computer</button>
+            <button class="mode-button" data-mode="Online" aria-pressed="false">Online room</button>
+        </div>
+        <div class="online-controls" id="online-controls" hidden>
+            <p class="connection-state" id="connection-state" aria-live="polite">Connecting…</p>
+            <button class="primary-button" id="create-room">Create a room</button>
+            <form id="join-form"><label for="room-code">Have a room code?</label><div class="join-row"><input id="room-code" maxlength="6" autocomplete="off" aria-label="Room code" /><button class="text-button" type="submit">Join</button></div></form>
+            <p class="room-invite" id="room-invite" hidden></p>
+        </div>
+        <div class="game-status" id="status" aria-live="polite">Choose a mode to begin.</div>
+        <div class="board" id="board" role="group" aria-label="Tic Tac Toe board">
+            @for (var i = 0; i < 9; i++) { <button class="cell" data-cell="@i" aria-label="Empty square @(i + 1)" disabled></button> }
+        </div>
+        <div class="game-actions"><button class="primary-button" id="start">Start a game</button><button class="text-button" id="restart" hidden>Play again</button><button class="text-button" id="rematch" hidden>Rematch</button></div>
+    </section>
+    <footer class="page-note"><span>Player X starts</span><span>·</span><span>One shared set of rules</span></footer>
+</main>
+@section Scripts { <script src="~/lib/signalr/signalr.min.js" asp-append-version="true"></script><script src="~/js/game.js" asp-append-version="true"></script> }
