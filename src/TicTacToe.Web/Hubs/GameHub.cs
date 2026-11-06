@@ -61,9 +61,9 @@ public sealed class GameHub(OnlineRoomManager rooms, IHubContext<GameHub> hubCon
     public async Task<RoomActionResponse> RequestRematch(string code)
     {
         var room = code.Trim().ToUpperInvariant();
-        if (!rooms.RequestRematch(room, Context.ConnectionId, out var game) || game is null)
+        if (!rooms.RequestRematch(room, Context.ConnectionId, out var game, out var requestedBy) || game is null)
             return new(false, "Rematch request rejected.");
-        await Clients.Group(room).SendAsync("RematchStatus", game);
+        await Clients.Group(room).SendAsync("RematchStatus", new { requestedBy, game });
         if (game.MoveCount == 0 && game.Status == TicTacToe.Domain.GameStatus.InProgress)
             await Clients.Group(room).SendAsync("GameUpdated", game);
         return new(true, null, Game: game);

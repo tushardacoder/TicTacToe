@@ -15,6 +15,7 @@
   let playerSymbol = null;
   let roomReady = false;
   let opponentDisconnected = false;
+  let rematchState = "idle";
   let busy = false;
   const symbol = value => value === 0 ? "X" : value === 1 ? "O" : null;
   const connection = new signalR.HubConnectionBuilder().withUrl("/gameHub").withAutomaticReconnect().build();
@@ -51,11 +52,28 @@
     }
   });
   connection.onclose(() => { connectionState.textContent = "Disconnected. Choose Online room to reconnect."; });
-  connection.on("RoomReady", next => { game = next; roomReady = true; opponentDisconnected = false; render(next); status.textContent = "Both players are here. X starts."; });
+  connection.on("RoomReady", next => { game = next; roomReady = true; opponentDisconnected = false; rematchState = "idle"; render(next); status.textContent = "Both players are here. X starts."; });
   connection.on("GameUpdated", next => { game = next; render(next); });
-  connection.on("PlayerDisconnected", who => { roomReady = false; opponentDisconnected = true; status.textContent = `${symbol(who)} left. They have 30 seconds to reconnect.`; render(game); });
-  connection.on("PlayerReconnected", state => { roomReady = state.ready; opponentDisconnected = !state.ready; game = state.game; render(state.game); });
-  connection.on("RematchStatus", () => { status.textContent = "Rematch requested. Waiting for the other player."; });
+  connection.on("PlayerDisconnected", who => { roomReady = false; opponentDisconnected = true; rematchState = "idle"; status.textContent = `${symbol(who)} left. They have 30 seconds to reconnect.`; render(game); });
+  connection.on("PlayerReconnected", state => { roomReady = state.ready; opponentDisconnected = !state.ready; game = state.game; rematchState = "idle"; render(state.game); });
+  connection.on("RematchStatus", payload => {
+    const requestedBy = payload && typeof payload === "object" && "requestedBy" in payload ? payload.requestedBy : null;
+    const next = payload && typeof payload === "object" && "game" in payload ? payload.game : payload;
+    if (next) game = next;
+    if (requestedBy === playerSymbol) {
+      rematchState = "requested";
+      status.textContent = "Rematch requested. Waiting for the other player.";
+    }
+    else if (requestedBy !== null && requestedBy !== undefined) {
+      rematchState = "invited";
+      status.textContent = "You are invited to a rematch.";
+    }
+    else if (game && game.status === 1 && game.moveCount === 0) {
+      rematchState = "idle";
+      status.textContent = "New round started. X starts.";
+    }
+    render(game);
+  });
 
   function setOnlineRoom(code) {
     roomCode = code;
@@ -84,7 +102,13 @@
     game = next;
     const current = symbol(next.currentTurn);
     const result = resultText(next.result);
-    if (result) status.textContent = result;
+    if (rematchState === "invited") {
+      status.textContent = "You are invited to a rematch.";
+    }
+    else if (rematchState === "requested") {
+      status.textContent = "Rematch requested. Waiting for the other player.";
+    }
+    else if (result) status.textContent = result;
     else if (mode === "Online" && !roomReady) status.textContent = opponentDisconnected ? "Opponent disconnected. Waiting for a reconnect." : "Waiting for another player to join.";
     else if (mode === "Online") status.textContent = current === symbol(playerSymbol) ? `Your turn (${current})` : `Waiting for ${current}`;
     else if (mode === "VsAi") status.textContent = current === "X" ? "Your turn" : "Computer's turn";
@@ -102,6 +126,23 @@
     const ended = next.status === 2;
     restart.hidden = mode === "Online" || !ended;
     rematch.hidden = mode !== "Online" || !ended;
+    if (mode === "Online" && ended) {
+      if (rematchState === "invited") {
+        rematch.hidden = false;
+        rematch.disabled = false;
+        rematch.textContent = "Join rematch";
+      }
+      else if (rematchState === "requested") {
+        rematch.hidden = false;
+        rematch.disabled = true;
+        rematch.textContent = "Rematch requested";
+      }
+      else {
+        rematch.hidden = false;
+        rematch.disabled = false;
+        rematch.textContent = "Rematch";
+      }
+    }
   }
   async function newGame() {
     if (busy) return;
@@ -184,7 +225,12 @@
   start.addEventListener("click", newGame);
   restart.addEventListener("click", newGame);
   rematch.addEventListener("click", async () => {
-    try { const result = await connection.invoke("RequestRematch", roomCode); if (!result.success) showError(result.error); }
+    try {
+      const result = await connection.invoke("RequestRematch", roomCode);
+      if (!result.success) { showError(result.error); return; }
+      rematchState = "requested";
+      render(game);
+    }
     catch (error) { showError(error); }
   });
   const invitation = new URLSearchParams(location.search).get("room");

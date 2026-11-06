@@ -115,13 +115,25 @@ public sealed class OnlineRoomManager
     }
     public bool RequestRematch(string code, string connectionId, out GameSnapshot? game)
     {
+        return RequestRematch(code, connectionId, out game, out _);
+    }
+
+    public bool RequestRematch(string code, string connectionId, out GameSnapshot? game, out PlayerSymbol? requestedBy)
+    {
         game = null;
+        requestedBy = null;
         if (!_rooms.TryGetValue(code, out var room)) return false;
         lock (room.Gate)
         {
             if (!_connections.TryGetValue(connectionId, out var member) || !member.Code.Equals(room.Code, StringComparison.OrdinalIgnoreCase) || room.Game.Status != GameStatus.Finished) return false;
+            requestedBy = member.Symbol;
             room.Rematches.Add(member.Symbol);
-            if (room.Rematches.Count == 2) { room.Game.Reset(); room.Rematches.Clear(); }
+            if (room.Rematches.Count == 2)
+            {
+                room.Game.Reset();
+                room.Rematches.Clear();
+                requestedBy = null;
+            }
             room.LastActivity = DateTimeOffset.UtcNow;
             game = room.Game.Snapshot(); return true;
         }
